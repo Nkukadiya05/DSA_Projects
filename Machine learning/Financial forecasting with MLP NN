@@ -1,0 +1,204 @@
+library(readxl)  # Library for reading Excel files
+library(neuralnet)  # Library for neural network modeling
+library(dplyr)  # Library for data manipulation
+library(grid)  # Grid graphics library
+library(MASS)  # Library for MASS package
+library(Metrics)  # Library for performance metrics
+
+data <- read_excel("Desktop/DM & ML/Exchange_data.xlsx")  # Read Excel data
+str(data)  # Display structure of data
+B_data <- data$`USD/EUR`  # Extracting the third column
+
+trainingSet <- B_data[2:401]  # Define training data
+testingSet <- B_data[402:501]  # Define testing data
+length(trainingSet)  # Display length of training data
+length(testingSet)  # Display length of testing data
+
+# B) Input/Output
+# For training set
+lag <- 4
+Training_lag <- bind_cols(
+  USD_tra_pr3 = lag(trainingSet, 4),
+  USD_tra_pr2 = lag(trainingSet, 3),
+  USD_tra_pr1 = lag(trainingSet, 2),
+  USD_tra_cur = lag(trainingSet, 1),
+  USD_tra_pred = trainingSet
+)
+Training_lag <- Training_lag[complete.cases(Training_lag),]  # Remove rows with missing values
+Training_lag  # Display training data
+str(Training_lag)  # Display structure of training data
+
+# For testing set
+Testing_lag <- bind_cols(
+  USD_tes_pr3 = lag(testingSet, 4),
+  USD_tes_pr2 = lag(testingSet, 3),
+  USD_tes_pr1 = lag(testingSet, 2),
+  USD_tes_cur = lag(testingSet, 1),
+  USD_tes_pred = testingSet
+)
+Testing_lag <- Testing_lag[complete.cases(Testing_lag),]  # Remove rows with missing values
+Testing_lag  # Display testing data
+str(Testing_lag)  # Display structure of testing data
+
+# C) Normalizing
+Norm_code <- function(x){
+  return ((x-min(x)) / (max(x)-min(x)))
+}
+Norm_training <- as.data.frame(lapply(Training_lag, Norm_code))  # Normalize training data
+Norm_testing <- as.data.frame(lapply(Testing_lag, Norm_code))  # Normalize testing data
+str(Norm_training)  # Display structure of normalized training data
+str(Norm_testing)  # Display structure of normalized testing data
+
+# D) Define and Train an MLP model
+NN_model <- neuralnet(USD_tra_pred ~ ., data = Norm_training, hidden = c(5,3), linear.output = TRUE, act.fct = "logistic")  # Define and train MLP model
+pred_output <- predict(NN_model, Norm_testing[, -5])  # Predict output for testing data
+pred_output  # Display predicted output
+plot(NN_model)  # Plot neural network model
+NN_model$result.matrix  # Display result matrix of neural network model
+
+# Finding min-max values of predictions...
+min_pred <- min(pred_output)  # Find minimum predicted value
+min_pred  # Display minimum predicted value
+max_pred <- max(pred_output)  # Find maximum predicted value
+max_pred  # Display maximum predicted value
+
+# Let's unnormalize the values...
+unnorm <- function(x, min, max) {
+  return ((max-min) * x + min)
+}
+
+# Define the values for original data...
+min_orig <- min(B_data)  # Find minimum value of original data
+max_orig <- max(B_data)  # Find maximum value of original data
+
+# Denormalize the predictions...
+strength_pred <- unnorm(pred_output, min_orig, max_orig)  # Denormalize predictions
+head(strength_pred)  # Display first few denormalized predictions
+
+# Calculate performance metrics
+RMSE <- sqrt(mean((strength_pred - Norm_testing$USD_tes_pred)^2))  # Calculate RMSE
+MAE <- mean(abs(strength_pred - Norm_testing$USD_tes_pred))  # Calculate MAE
+MAPE <- mean(abs((strength_pred - Norm_testing$USD_tes_pred) / Norm_testing$USD_tes_pred)) * 100  # Calculate MAPE
+sMAPE <- 2 * MAPE / (1 + MAPE) * 100  # Calculate sMAPE
+
+cat("RMSE:", RMSE, "\n")  # Display RMSE
+cat("MAE:", MAE, "\n")  # Display MAE
+cat("MAPE:", MAPE, "\n")  # Display MAPE
+cat("sMAPE:", sMAPE, "\n")  # Display sMAPE
+
+# F) Define neural network structures and evaluate performance
+
+# Define neural network structures
+models_comb <- list(
+  model_1 = neuralnet(USD_tra_pred ~ ., data = Norm_training, hidden = 5, linear.output = TRUE, act.fct = "logistic"),
+  model_2 = neuralnet(USD_tra_pred ~ ., data = Norm_training, hidden = 10, linear.output = TRUE, act.fct = "logistic"),
+  model_3 = neuralnet(USD_tra_pred ~ ., data = Norm_training, hidden = c(5, 5), linear.output = TRUE, act.fct = "logistic"),
+  model_4 = neuralnet(USD_tra_pred ~ ., data = Norm_training, hidden = c(10, 10), linear.output = TRUE, act.fct = "logistic"),
+  model_5 = neuralnet(USD_tra_pred ~ ., data = Norm_training, hidden = c(5, 5, 5), linear.output = TRUE, act.fct = "logistic"),
+  model_6 = neuralnet(USD_tra_pred ~ ., data = Norm_training, hidden = c(10, 10, 10), linear.output = TRUE, act.fct = "logistic"),
+  model_7 = neuralnet(USD_tra_pred ~ ., data = Norm_training, hidden = 5, linear.output = TRUE, act.fct = "tanh"),
+  model_8 = neuralnet(USD_tra_pred ~ ., data = Norm_training, hidden = 10, linear.output = TRUE, act.fct = "tanh"),
+  model_9 = neuralnet(USD_tra_pred ~ ., data = Norm_training, hidden = c(5, 5), linear.output = TRUE, act.fct = "tanh"),
+  model_10 = neuralnet(USD_tra_pred ~ ., data = Norm_training, hidden = c(10, 10), linear.output = TRUE, act.fct = "tanh"),
+  model_11 = neuralnet(USD_tra_pred ~ ., data = Norm_training, hidden = c(5, 5, 5), linear.output = TRUE, act.fct = "tanh"),
+  model_12 = neuralnet(USD_tra_pred ~ ., data = Norm_training, hidden = c(10, 10, 10), linear.output = TRUE, act.fct = "tanh")
+)
+
+# Evaluate performance of each model
+performance <- lapply(models_comb, function(model) {
+  pred_output <- predict(model, Norm_testing[, -5])
+  strength_pred <- unnorm(pred_output, min_orig, max_orig)
+  RMSE <- sqrt(mean((strength_pred - Norm_testing$USD_tes_pred)^2))
+  MAE <- mean(abs(strength_pred - Norm_testing$USD_tes_pred))
+  MAPE <- mean(abs((strength_pred - Norm_testing$USD_tes_pred) / Norm_testing$USD_tes_pred)) * 100
+  sMAPE <- 2 * MAPE / (1 + MAPE) * 100
+  return(c(RMSE = RMSE, MAE = MAE, MAPE = MAPE, sMAPE = sMAPE))
+})
+
+# Create a comparison table
+comparison_table <- data.frame(
+  Model = paste("Model", 1:12),
+  Description = c(
+    "1 hidden layer with 5 nodes (logistic)",
+    "1 hidden layer with 10 nodes (logistic)",
+    "2 hidden layers with 5 nodes each (logistic)",
+    "2 hidden layers with 10 nodes each (logistic)",
+    "3 hidden layers with 5 nodes each (logistic)",
+    "3 hidden layers with 10 nodes each (logistic)",
+    "1 hidden layer with 5 nodes (tanh)",
+    "1 hidden layer with 10 nodes (tanh)",
+    "2 hidden layers with 5 nodes each (tanh)",
+    "2 hidden layers with 10 nodes each (tanh)",
+    "3 hidden layers with 5 nodes each (tanh)",
+    "3 hidden layers with 10 nodes each (tanh)"
+  ),
+  t(sapply(performance, unlist))
+)
+comparison_table  # Display comparison table
+
+# G) Create comparison table with performance metrics
+
+comparison_table <- data.frame(
+  Model = paste("Model", 1:12),
+  Description = c(
+    "1 hidden layer with 5 nodes (logistic)",
+    "1 hidden layer with 10 nodes (logistic)",
+    "2 hidden layers with 5 nodes each (logistic)",
+    "2 hidden layers with 10 nodes each (logistic)",
+    "3 hidden layers with 5 nodes each (logistic)",
+    "3 hidden layers with 10 nodes each (logistic)",
+    "1 hidden layer with 5 nodes (tanh)",
+    "1 hidden layer with 10 nodes (tanh)",
+    "2 hidden layers with 5 nodes each (tanh)",
+    "2 hidden layers with 10 nodes each (tanh)",
+    "3 hidden layers with 5 nodes each (tanh)",
+    "3 hidden layers with 10 nodes each (tanh)"
+  ),
+  RMSE = c(
+    0.7943173, 0.7944725, 0.7939278, 0.7934415, 0.7945817, 0.7946104,
+    0.7875318, 0.7942693, 0.7942901, 0.7928014, 0.7950958, 0.7934470
+  ),
+  MAE = c(
+    0.7734720, 0.7736097, 0.7730415, 0.7726489, 0.7737234, 0.7737482,
+    0.7670723, 0.7734080, 0.7735784, 0.7721395, 0.7743938, 0.7729069
+  ),
+  MAPE = c(
+    Inf, Inf, Inf, Inf, Inf, Inf,
+    Inf, Inf, Inf, Inf, Inf, Inf
+  ),
+  sMAPE = c(
+    NaN, NaN, NaN, NaN, NaN, NaN,
+    NaN, NaN, NaN, NaN, NaN, NaN
+  )
+)
+
+# Function to identify most efficient model
+eff_model <- function(comparison_table) {
+  # Calculate the average performance metric
+  comparison_table$Average_RMSE <- rowMeans(comparison_table[, c("RMSE", "MAE")])
+  
+  # Identify the model with the minimum average performance metric
+  most_efficient <- comparison_table[which.min(comparison_table$Average_RMSE), ]
+  most_efficient
+}
+
+# Call the function to identify the most efficient model
+eff_model(comparison_table)
+
+# H) Create scatter plot and compute performance metrics for the best model
+
+desired_output <- Norm_testing$USD_tes_pred  # Define desired output
+
+# Create a scatter plot
+plot(desired_output, strength_pred, xlab = "Desired Output", ylab = "Predicted Output", main = "Prediction Output vs. Desired Output")
+
+# Compute performance metrics for the best model
+RMSE <- sqrt(mean((strength_pred - desired_output)^2))  # Calculate RMSE
+MAE <- mean(abs(strength_pred - desired_output))  # Calculate MAE
+MAPE <- mean(abs((strength_pred - desired_output) / desired_output)) * 100  # Calculate MAPE
+sMAPE <- 2 * MAPE / (1 + MAPE) * 100  # Calculate sMAPE
+
+cat("RMSE:", RMSE, "\n")  # Display RMSE
+cat("MAE:", MAE, "\n")  # Display MAE
+cat("MAPE:", MAPE, "\n")  # Display MAPE
+cat("sMAPE:", sMAPE, "\n")  # Display sMAPE
