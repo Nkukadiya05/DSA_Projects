@@ -1,0 +1,132 @@
+library(readxl)  # Import library for reading Excel files
+library(Rcpp)
+library(dplyr)
+library(ggplot2)
+library(NbClust)  # Import library for clustering analysis
+library(cluster)
+library(factoextra)
+library(fpc)
+
+Data <- read_excel("Desktop/DM & ML/Whitewine_v6.xlsx")  # Read the Excel file
+Dataframe <- Data[, -12]  # Extract columns excluding the last one
+View(Dataframe)  # Display the extracted data in a viewer
+
+# A) Pre-processing of data white wine data...
+#### SUBTASK 1: ####
+
+# Scaling and Outlier detection...
+Scale_data <- scale(Dataframe)  # Scale the data
+summary(Scale_data)  # Summarize the scaled data
+
+# Boxplot before cleaning the data
+par(mfrow = c(3, 4), mar=c(4,4,2,1))  # Set up plot layout
+for (i in 1:ncol(Scale_data)) {
+  boxplot(Scale_data[, i], main = colnames(Scale_data)[i])  # Plot boxplot for each column
+}
+
+# Clean the data by removing outliers
+Scale_data_df <- as.data.frame(Scale_data)  # Convert scaled data to data frame
+cleaned_data <- Scale_data_df
+for (i in 1:ncol(cleaned_data)) {
+  Q1 <- quantile(cleaned_data[[i]], 0.25)  # Calculate first quartile
+  Q3 <- quantile(cleaned_data[[i]], 0.75)  # Calculate third quartile
+  IQR <- Q3 - Q1  # Calculate interquartile range
+  outliers <- cleaned_data[[i]]<(Q1 - 1.5*IQR) | cleaned_data[[i]]>(Q3+1.5*IQR)  # Identify outliers
+  cleaned_data <- cleaned_data[!outliers, ]  # Remove outliers
+}
+
+dim(Scale_data_df)  # Display dimensions of original data frame
+dim(cleaned_data)  # Display dimensions of cleaned data
+
+# Plot boxplot after cleaning the data
+par(mfrow = c(3, 4), mar=c(4,4,2,1))  # Set up plot layout
+for (i in 1:ncol(cleaned_data)) {
+  boxplot(cleaned_data[, i], main = colnames(cleaned_data)[i])  # Plot boxplot for each column
+}
+summary(cleaned_data)  # Summarize the cleaned data
+
+# B) Determine the number of clusters with four automated tools...
+# Assigning number of clusters...
+NbC <- NbClust(cleaned_data, distance = "euclidean", min.nc=3, max.nc = 10, method="kmeans", index="all")  # Determine number of clusters
+NbC
+
+# Elbow method...
+k <- 3:10
+WithinSS <- sapply(k, function(k) {kmeans(cleaned_data, centers=k)$tot.withinss})  # Calculate WithinSS for different values of k
+plot(k, WithinSS, type="l",xlab= "Number of clusters", ylab="Within sum of sqaures")  # Plot Elbow method
+
+# Gap statistics...
+Gstat <- clusGap(cleaned_data, FUN = kmeans, nstart= 10, K.max=5, B=20)  # Calculate gap statistics
+fviz_nbclust(cleaned_data, FUN = kmeans, method="gap_stat")  # Plot Gap statistics
+
+# Silhouette method...
+fviz_nbclust(cleaned_data, kmeans, method = "silhouette")  # Plot Silhouette method
+
+# C) Perform k-means clustering...
+fav_K <- 3
+kmeans_res <- kmeans(cleaned_data, centers = fav_K)  # Perform k-means clustering
+kmeans_res
+
+BetSS <- kmeans_res$betweenss  # Extract between-cluster sum of squares
+WidSS <- kmeans_res$tot.withinss  # Extract total within-cluster sum of squares
+TotSS <- BetSS + WidSS  # Calculate total sum of squares
+BetSS_TotSS_ratio <- BetSS / TotSS  # Calculate ratio of between-cluster sum of squares to total sum of squares
+BetSS
+WidSS
+BetSS_TotSS_ratio
+
+# D) visualise silhoutte plot...
+vis_sil <- silhouette(kmeans_res$cluster, dist(cleaned_data))  # Compute silhouette plot
+vis_sil
+fviz_silhouette(vis_sil)  # Visualize silhouette plot
+
+average_sil <- mean(vis_sil[, "sil_width"])  # Calculate average silhouette width
+average_sil
+
+#### SUBTASK 2: ####
+# E) 
+# Perform PCA
+pca_perform = prcomp(cleaned_data, scale= FALSE)  # Perform PCA
+pca_perform
+names(pca_perform)  # Display names of principal components
+summary(pca_perform)  # Summarize the PCA results
+
+# Cumulative proportion of variance explained...
+cum_PVE <- cumsum((pca_perform$sdev^2) / sum(pca_perform$sdev^2))  # Calculate cumulative proportion of variance explained
+round(cum_PVE, 3)  # Round the cumulative proportion of variance explained
+barplot(cum_PVE, xlab = "PC", ylab = "Variance", names.arg=1:length(cum_PVE), las=1, ylim=c(0,max(cum_PVE)), col='gray')  # Plot barplot for cumulative proportion of variance explained
+number_comp <- sum(cum_PVE > 0.85)  # Determine the number of principal components explaining at least 85% of variance
+transformed_PC <- pca_perform$x[, 1:number_comp]  # Extract principal components explaining at least 85% of variance
+
+cum_PVE  # Display cumulative proportion of variance explained
+number_comp  # Display the number of principal components explaining at least 85% of variance
+transformed_PC  # Display the transformed dataset with selected principal components
+
+# F) Number of clusters...
+pca_comp <- pca_perform$x  # Extract principal components
+kmeans_res <- kmeans(pca_comp, centers = 3)  # Perform k-means clustering
+fviz_nbclust(pca_comp, kmeans, method = "wss")  # Visualize number of clusters using within-cluster sum of squares
+fviz_nbclust(pca_comp, kmeans, method = "silhouette")  # Visualize number of clusters using silhouette method
+fviz_nbclust(pca_comp, kmeans, method = "gap_stat")  # Visualize number of clusters using gap statistics
+
+# G) Perform k-means clustering...
+kequal = 3
+kmeans_datawine = kmeans(pca_comp, centers = kequal, nstart = 15)  # Perform k-means clustering
+fit_kmean <- kmeans(pca_comp, 3)  # Fit k-means clustering model
+fit_kmean  # Display k-means clustering results
+Witss = fit_kmean$tot.withinss  # Extract total within-cluster sum of squares
+Betss = fit_kmean$betweenss  # Extract between-cluster sum of squares
+Witss  # Display total within-cluster sum of squares
+Betss  # Display between-cluster sum of squares
+fviz_cluster(kmeans_datawine, data = pca_comp)  # Visualize clustering results
+
+# H) Visualize silhouette plot...
+width_silh <- silhouette(kmeans_datawine$cluster, dist(pca_comp))  # Compute silhouette plot
+fviz_silhouette(width_silh)  # Visualize silhouette plot
+
+ave_width_silh <- mean(width_silh[, "sil_width"])  # Calculate average silhouette width
+ave_width_silh  # Display average silhouette width
+
+# I) Calculate Calinski-Harabasz Index
+calinski_harabasz_index <- calinhara(pca_comp, kmeans_datawine$cluster)  # Calculate Calinski-Harabasz Index
+cat("Calinski-Harabasz Index:", calinski_harabasz_index, "\n")  # Print the Calinski-Harabasz Index
