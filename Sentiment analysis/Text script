@@ -1,0 +1,88 @@
+% Sample text sentiments textSentiments = {
+"Maison Souquet was a pleasure house during the belle époque, today it's an extraordinary boutique address with a Jacques Garcia décor as indulgent.";
+"Highly personalized service is akin to having your own butler and, quite frankly, once checked-in, you should have no desire to leave. Fine art books and antiquarian games to appreciate there are a plenty.";
+"Each room enjoys a carefully curated selection of period art and history books, an espresso machine, complimentary mineral water and bedside chocolates at turndown service.";
+"In fashionable South Pigalle, at the foot of Montmartre, in northern Paris. This is both the fabled Paris of old timer cabarets and peep shows, and an edgy part of modern Paris packed with new-generation cocktail bars.";
+"A red ribbon draped Dita mixing cardamom infused vodka with champagne, hibiscus syrup and fiery green chartreuse perhaps or a rose petal laced Leila in the sultry, red velvet";
+"When the Powers opened in 1920 it was an instant Haussmann beauty. Its refurbishment has now morphed the prestigious Golden Triangle maison into an oasis of on-trend Parisian chic.";
+"In the glamorous ‘Golden Triangle’ the luxury designer boutiques of avenue Montaigne, avenue George V and the Champs Elysées are a shopping bag swing away";
+"The historic hotel has reemerged as an outstandingly beautiful, sensual mirage of original decorative features, From the playful use of mirrors.";
+"Personal and discreet. Guests are greeted by name and Thibault, the concierge, ensures no request remains unanswered. The well equipped gym. Spa Thala, named after the beautiful Italian pink marble underfoot.";
+"Every room has a graceful 1940s styled wooden desk and the well curated minibar, kettle and coffee machine are concealed in a long legged cabinet.";
+"A severe flood warning, meaning there is a danger to life, has been issued for Billing Aquadrome, a leisure park in Northampton.";
+"The impact of climate change on the frequency of storms is still unclear, but we know that increased sea surface temperatures warm the air above.";
+"We're creatures of habit when it comes to Christmas and our data shows that the classic festive plate remains much the same.";
+"The longest strike in the history of the NHS is getting under way as junior doctors take part in a six day walkout. Thousands of junior doctors, who make up nearly half the doctor workforce in the NHS.";
+"Routine hospital services, such as planned operations, like hip and knee replacements and check-ups, will be hugely disrupted.This is because senior doctors are being moved across to provide cover.";
+"Pupils at schools in England that are partially closed because of dangerous concrete will not get extra help in their exams, the government has said.";
+"Schools are concerned about the loss of specialist spaces which cannot be easily replicated, such as technology work rooms, science labs, sports facilities, toilets and canteens.";
+"We apologise to local residents about this unfortunate mistake. The mistake
+ was not present in the design that Essex Highways signed off.";
+"In a small number of cases where there are disputes or security concerns or
+discrepancies, further work needs to be done, but they have all been through that processing.";
+"A few victims have reported to us that they've had phone calls purporting to be from their GP, or from their local pharmacy, asking for that victim to provide bank details.";
+"Political parties contribute to the UK’s representative democracy but require income to fund their activities. Private funding of political parties is associated.";
+"This episode focuses on the challenges facing accident and emergency departments and more importantly, possible ways to solve some of the issues impacting both staff and patients.";
+"One year ago, Rishi Sunak made five pledges for voters to judge him on.The prime minister met his pledge to halve inflation by the end of 2023, leaving four pledges outstanding.";
+"Reform UK will kick off the political year with a press conference later this morning setting out the party's plans for the year ahead.";
+"The new year is upon us, and the political party leaders are set to launch their bids to convince the public to back them in the upcoming general election.";
+};
+cleanTokens = cell(size(textSentiments)); % Preallocating cell array for clean tokens
+numFeatures = 50; % Doing sampeling
+bagOfWordsMatrix = zeros(numel(textSentiments), numFeatures); % Adjusted the size of BagOfWords as long i needed
+tfidfMatrix = zeros(numel(textSentiments), numFeatures); % Adjusted the size of frequency as i needed
+for i = 1:size(textSentiments,1) % Initialising the Loop through each text sentiment
+normalizedText = lower(textSentiments{i}); % Text normalization: Converting the text to lowercase
+tokens = strsplit(normalizedText, ' '); % Tokenization: Spliting the text into words
+cleanTokens{i} = {};
+for j = 1:size(tokens) % Initialising the Loop through each text sentiment
+npunctDataModel = erasePunctuation(normalizedText); % Removing punctuation and stopwords
+tokensModel = tokenizedDocument(npunctDataModel); % Displaying model
+
+ stopWords = {'a', 'an', 'the', 'and', 'or', 'is', 'was', 'were', 'it', 'in', 'on', 'at', 'to', 'with'};
+if ~ismember(tokens, stopWords) % Checking if the token is not a stopword
+cleanTokens{i} = [cleanTokens{i}, token]; % Setting it in the vertiacal format
+end end
+end
+% % PART 2 TEXT VECTORISATION
+vectorizedData = cellfun(@preprocessAndVectorize, textSentiments, 'UniformOutput', false); % Preallocating for the preprocess and vectorising NumDocuments = length(vectorizedData); % Counting the number of documents
+vocabularySet = {}; % Initialising an empty vocabulary set
+totalWords = 0;
+maxCountsLength = 0;
+wordCountsCell = cell(NumDocuments, 1);% Initialising variables for total words and counts
+for i = 1:NumDocuments % Initialising the Loop through each document currentVectorizedData = vectorizedData{i}; % Geting the current document's
+vectorized data
+vocabularySet = union(vocabularySet, currentVectorizedData.Vocabulary); % Updating the vocabulary set
+totalWords = totalWords + sum(currentVectorizedData.Counts); % Updating total words
+wordCountsCell{i} = currentVectorizedData.Counts; % Storing word counts for each document separately
+maxCountsLength = max(maxCountsLength, numel(currentVectorizedData.Counts)); % Updating the maximum counts length
+end
+wordCounts = zeros(NumDocuments, maxCountsLength); % Preallocating the vectors with zeros before concatenating
+for i = 1:NumDocuments % Initialising the Loop through each document
+wordCounts(i, 1:numel(wordCountsCell{i})) = wordCountsCell{i}; % applying the loop in i format
+end
+
+ % % metadata creation
+metadataFileName = '/Users/macintosh/Desktop/Engineering/Text_Metadata'; % Directory to save metadata
+fileattrib(metadataFileName) % Checking the file attributes fileattrib(metadataFileName, '+w') % Modifying the file attributes vocabularySize = length(vocabularySet); % Calculating the number of unique words in the vocabulary
+NumWords = totalWords; % Calculating the total number of words
+fprintf('Number of Documents: %d\n', NumDocuments); % Displaying the metadata
+fprintf('Vocabulary Size: %d\n', vocabularySize); % Displaying the metadata fprintf('Total Number of Words: %d\n', NumWords); % Displaying the metadata fprintf('Word Counts Distribution: Mean = %.2f, Median = %.2f, Min = %d, Max = %d\n', ...
+mean(wordCounts(:)), median(wordCounts(:)), min(wordCounts(:)), max(wordCounts(:))); % Code to fill the data in above metadata
+metadataFileName = 'Text_Metadata.mat'; % Specifying the file name for saving metadata.
+save(metadataFileName, 'NumDocuments', 'vocabularySize', 'NumWords', 'wordCounts'); % Saving metadata to a .mat file
+fprintf('Metadata saved to %s\n', metadataFileName); %printing the metadata
+for i = 1:length(vectorizedData) % Initialising the Loop through each document fprintf('Document %d after vectorization:\n', i); % Setting the heading in
+metadata file
+disp(vectorizedData{i}); % Displaying the vectorized data
+end
+function vectorizedData = preprocessAndVectorize(textData) % Funtionising the vector data to start loop
+% Lowercasing, tokenization, and removing punctuation tokens = replace(lower(textData), '\W', '');
+tokens = strsplit(tokens, ' ');
+% Removing stopwords
+stopWords = {'a', 'an', 'the', 'and', 'or', 'is', 'was', 'to', 'of', 'in', 'for', 'with', 'on', 'as', 'there', 'are', 'your', 'you', 'have', 'no', 'but', 'it', 'its', 'an', 'at', 'by', 'that', 'should', 'been', 'from', 'by', 'once', 'if', 'be', 'not'};
+tokens = setdiff(tokens, stopWords);
+% Converting to bag of words representation
+vectorizedData = bagOfWords(tokens); end
+
+ 
